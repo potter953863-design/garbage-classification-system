@@ -1,0 +1,29 @@
+# Python 缓存
+__pycache__/
+*.py[cod]
+
+# 虚拟环境
+.venv/
+venv/
+
+# IDE 配置 (不需要上传)
+.vscode/
+.idea/
+.cursor/
+
+# 数据集 (太大了，别人用代码自己去下，或者你单独提供链接)
+datasets/
+trainval/
+dirty_data_backup/
+
+# 临时文件
+*.tmp
+*.log
+repomix-output.xml
+
+# === 关键点：模型文件 ===
+# GitHub 免费版限制单个文件 100MB。
+# 你的 best_model_sgd.pth 超过了限制，必须忽略，否则 push 会失败！
+*.pth
+# 如果你想上传小的 S 版模型 (80MB)，可以用 !例外规则，但建议统一在 Release 里发布
+# !best_model_fast.pth
