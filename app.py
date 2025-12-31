@@ -84,8 +84,8 @@ def download_file(url, save_path):
 
 
 
-S_MODEL_URL = "sha256:ac3446e1386cd9da78b052673d3541970c768b4237090056bf7918d205d643d1"
-M_MODEL_URL = "sha256:79551aa2433cbfa0c298a9f31871aab05ce32d8cf97d5f6668d15626e2ab50bf"
+S_MODEL_URL = "https://github.com/potter953863-design/garbage-classification-system/releases/download/v1.0.0/best_model_fast.pth"
+M_MODEL_URL = "https://github.com/potter953863-design/garbage-classification-system/releases/download/v1.0.0/best_model_sgd.pth"
 
 # 执行下载检查 (这会在加载模型前运行)
 download_file(S_MODEL_URL, os.path.join(BASE_DIR, 'best_model_fast.pth'))
