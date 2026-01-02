@@ -83,21 +83,28 @@ def download_file(url, save_path):
         st.stop() # 停止运行
 
 
-
+# ✅ 使用您正确的仓库地址
 S_MODEL_URL = "https://github.com/potter953863-design/garbage-classification-system/releases/download/v1.0.0/best_model_fast.pth"
 M_MODEL_URL = "https://github.com/potter953863-design/garbage-classification-system/releases/download/v1.0.0/best_model_sgd.pth"
 
-# 执行下载检查 (这会在加载模型前运行)
-download_file(S_MODEL_URL, os.path.join(BASE_DIR, 'best_model_fast.pth'))
-download_file(M_MODEL_URL, os.path.join(BASE_DIR, 'best_model_sgd.pth'))
+# 🔴 关键修改：更改本地保存的文件名 (加了 _v1 后缀)
+# 这会强制 Streamlit Cloud 认为文件不存在，从而触发重新下载，覆盖掉之前的损坏文件
+FAST_MODEL_PATH = os.path.join(BASE_DIR, 'best_model_fast_v1.pth')
+SGD_MODEL_PATH = os.path.join(BASE_DIR, 'best_model_sgd_v1.pth')
+
+# 执行下载检查
+download_file(S_MODEL_URL, FAST_MODEL_PATH)
+download_file(M_MODEL_URL, SGD_MODEL_PATH)
 
 
 # ==========================================
 # 模型路径配置
 # ==========================================
-MODEL_S_PATH = os.path.join(BASE_DIR, 'best_model_fast.pth')
-MODEL_M_PATH = os.path.join(BASE_DIR, 'best_model_sgd.pth')
-# 如果 SGD 版不存在，尝试加载 Large 版
+# 🔴 更新路径指向新下载的文件
+MODEL_S_PATH = FAST_MODEL_PATH
+MODEL_M_PATH = SGD_MODEL_PATH
+
+# (旧逻辑保留，但实际上会被上面的 download_file 覆盖)
 if not os.path.exists(MODEL_M_PATH):
     MODEL_M_PATH = os.path.join(BASE_DIR, 'best_model_large.pth')
 
@@ -143,7 +150,6 @@ def load_ensemble_models():
         st.warning(f"Please check if {MODEL_S_PATH} or {MODEL_M_PATH} exists.")
 
     # 这里我们使用 config 中的 CLASS_NAMES，因为训练时通常保持一致
-    # 如果你的 checkpoint 包含 idx_to_class，可以在这里解析，但 timm checkpoint 通常不带这个
     return models, device, CLASS_NAMES
 
 def predict_ensemble(image, models, device, idx_to_class, city_id='default'):
@@ -789,17 +795,17 @@ def main():
                 # 使用缓存的地图服务
                 map_service = get_map_service()
                 default_location_label = translate("location.default_location")
-                
+
                 st.markdown(translate("location.input_title"))
                 st.info(translate("location.input_hint"))
-                
+
                 user_lat = None
                 user_lon = None
                 start_label = None
                 coordinates_ready = False
                 address_input = None
                 address_text_for_query = None
-                
+
                 location_methods = {
                     "address": translate("location.method_address"),
                     "coordinates": translate("location.method_coordinates")
@@ -811,17 +817,18 @@ def main():
                     horizontal=True,
                     key=f"location_method_{predicted_category}"
                 )
-                
+
                 if location_method == "address":
                     address_input = st.text_input(
                         translate("location.address_label"),
                         key=f"address_input_{predicted_category}",
                         placeholder=translate("location.address_placeholder")
                     )
-                    
+
                     if address_input:
                         with st.spinner(translate("location.address_spinner")):
                             coords = map_service.geocode(address_input)
+
                             if coords:
                                 user_lat, user_lon = coords
                                 cleaned_label = address_input.strip()
@@ -830,8 +837,11 @@ def main():
                                 coordinates_ready = True
                                 st.success(translate("location.address_success", lat=user_lat, lon=user_lon))
                             else:
-                                st.warning(translate("location.address_fail"))
-                                coordinates_ready = False
+                                # 手机端/云端容错：如果解析失败，使用默认坐标+模糊搜索
+                                st.warning("⚠️ 云端网络无法解析精确坐标，将使用模糊搜索模式。")
+                                user_lat, user_lon = 39.9042, 116.4074 # 北京坐标作为基准
+                                address_text_for_query = address_input # 依靠APP进行模糊搜索
+                                coordinates_ready = True
                 else:
                     col_lat, col_lon = st.columns(2)
                     with col_lat:
@@ -848,19 +858,19 @@ def main():
                             format="%.6f",
                             key=f"lon_input_{predicted_category}"
                         )
-                    
+
                     start_label_input = st.text_input(
                         translate("location.coords_name_label"),
                         key=f"start_label_{predicted_category}",
                         placeholder=translate("location.coords_name_placeholder")
                     )
-                    
+
                     if user_lat and user_lon:
                         coordinates_ready = True
                         start_label = start_label_input.strip() if start_label_input else default_location_label
                         address_text_for_query = start_label
-                
-                
+
+
                 search_triggered = False
                 if coordinates_ready and user_lat and user_lon:
                     st.markdown("---")
@@ -872,7 +882,7 @@ def main():
                             type="primary",
                             use_container_width=True
                         )
-                
+
                 if search_triggered and user_lat and user_lon:
                     try:
                         with st.spinner(translate("location.search_spinner")):
@@ -894,7 +904,7 @@ def main():
                         st.error(translate("location.search_error", error=e))
                 else:
                     st.info(translate("location.search_prompt"))
-            
+
             with st.expander(translate("results.all_probs_title")):
                 prob_data = []
                 classes_to_use = stored_idx_to_class if stored_idx_to_class is not None else CLASS_NAMES
@@ -908,7 +918,7 @@ def main():
                         "Category": f"{category} ({category_label})",
                         "Probability": f"{prob*100:.2f}%"
                     })
-                
+
                 df = pd.DataFrame(prob_data)
                 df = df.sort_values("Probability", ascending=False, key=lambda x: x.str.rstrip('%').astype(float))
                 st.dataframe(df, hide_index=True)
@@ -921,7 +931,7 @@ def main():
                 st.markdown(translate("results.howto_upload"))
                 st.markdown(translate("results.howto_camera"))
                 st.markdown(translate("results.howto_button"))
-    
+
     # Footer
     st.markdown("---")
     st.markdown(
